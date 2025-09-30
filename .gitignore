@@ -1,0 +1,80 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.env
+.env.*
+
+# Packaging / build artifacts
+build/
+dist/
+wheels/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# Testing / coverage
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache/
+htmlcov/
+coverage.xml
+
+# Type checkers / linters
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Logs
+*.log
+logs/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---------- Jupyter ----------
+# Global notebook checkpoints
+**/.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# Keep notebooks in ./Notebooks but ignore their checkpoints/exports
+Notebooks/.ipynb_checkpoints/
+Notebooks/*-checkpoint.ipynb
+Notebooks/.nbconvert/
+Notebooks/*.html
+Notebooks/*.pdf
+
+
+#data
+data/*
+# Optional: ignore big model/data artifacts (uncomment as needed)
+# data/
+# datasets/
+# models/
+# *.pkl
+# *.pickle
+# *.joblib
+# *.h5
+# *.hdf5
+# *.pt
+# *.pth
+# *.onnx
+# .cache/
+
+# Notebook scripts exported by tools like jupytext
+*.nb.py
