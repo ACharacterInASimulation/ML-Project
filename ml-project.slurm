@@ -5,7 +5,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=120G
+#SBATCH --gres=gpu:nvidia-rtx-5000-ada-generation:1
+#SBATCH --mem=90G
 #SBATCH --time=20:00:00
 
 module load cuda/12.1
