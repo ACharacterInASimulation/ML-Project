@@ -18,7 +18,7 @@ from sklearn.feature_selection import RFE
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifiercd 
 from sklearn.experimental import enable_halving_search_cv 
 from sklearn.model_selection import HalvingGridSearchCV
 from sklearn.decomposition import TruncatedSVD
@@ -26,12 +26,167 @@ from xgboost import XGBClassifier
 from sklearn.base import clone
 
 
-from features import feature_engineering
-from const import RANDOM_SEED, DATA_PATH, TARGET_COLUMN, TEST_DATA_PATH, PIPELINE_CACHE_DIR
-from const import BEST_RF_PARAMS, BEST_XGB_PARAMS, RESULTS_PATH
+#from features import feature_engineering
+#from const import RANDOM_SEED, DATA_PATH, TARGET_COLUMN, TEST_DATA_PATH, PIPELINE_CACHE_DIR
+#from const import BEST_RF_PARAMS, BEST_XGB_PARAMS, RESULTS_PATH
 
 import warnings
 warnings.filterwarnings('ignore')
+
+
+import pandas as pd
+import numpy as np
+import random
+#from const import RANDOM_SEED, DATA_PATH
+
+#Set Random seed
+np.random.seed(RANDOM_SEED)
+random.seed(RANDOM_SEED)
+
+RANDOM_SEED = 42
+DATA_PATH = "./data/Train.csv"
+TEST_DATA_PATH = "./data/Test.csv"
+TARGET_COLUMN = "CHURN"
+PIPELINE_CACHE_DIR = 'tmp_cache'
+
+LOG_FILE_PATH = "./logs/gridsearch.out"
+
+
+BEST_RF_PARAMS = {'classifier__max_depth': 10, 'classifier__min_samples_leaf': 1, 'classifier__min_samples_split': 2, 'classifier__n_estimators': 100}
+
+
+BEST_XGB_PARAMS = {'classifier__learning_rate': 0.1, 'classifier__max_depth': 3, 'classifier__n_estimators': 200, 'classifier__subsample': 1.0, 'feature_selector__k': 30}
+
+
+
+
+
+def create_derived_features(df):
+  #null counts
+  df["NULL_COUNTS"] = df.isna().sum(axis=1)
+
+  #revenue per frequency
+  df['REVENUE_PER_FREQUENCE'] = df['REVENUE'] / (df['FREQUENCE'] + 1)
+
+  #spending consistency
+  df['SPENDING_CONSISTENCY'] = df['MONTANT'] / (df['REVENUE'] + 1)
+
+  #high value customer
+  df['HIGH_VALUE_CUSTOMER'] = (df['ARPU_SEGMENT'] > df['ARPU_SEGMENT'].median()).astype(int)
+
+  #spending pattern
+  df['SPENDING_PATTERN'] = df['MONTANT'] / (df['FREQUENCE_RECH'] + 1)
+
+  # Engagement score
+  df['ENGAGEMENT_SCORE'] = (df['FREQUENCE_RECH'] + df['FREQUENCE']) / 2 
+
+  #usage decline
+  df['USAGE_DECLINE'] = (df['FREQUENCE_RECH'] < df['FREQUENCE']).astype(int)
+
+
+  # unlimited pack user
+  df['UNLIMITED_PACK'] = 0
+  df.loc[df['TOP_PACK'].str.contains("unlimited", case=False, na=False), 'UNLIMITED_PACK'] = 1
+
+  # popular pack
+  low = df['TOP_PACK'].value_counts().describe()["25%"]
+  mid = df['TOP_PACK'].value_counts().describe()["50%"]
+  high = df['TOP_PACK'].value_counts().describe()["75%"]
+
+  val_counts = df['TOP_PACK'].value_counts()
+
+  def pack_pop(pack):
+    if pack is np.nan:
+      return -1
+
+    val = val_counts[pack]
+
+    if val < low:
+      return 1
+    elif val < mid:
+      return 2
+    elif val < high:
+      return 3
+    else:
+      return 4
+
+  df["PACK_POP"] = df['TOP_PACK'].apply(pack_pop)
+
+
+  manual_derived_columns = ['NULL_COUNTS', 'REVENUE_PER_FREQUENCE', 'SPENDING_CONSISTENCY',
+                            'HIGH_VALUE_CUSTOMER', 'SPENDING_PATTERN', 'ENGAGEMENT_SCORE',
+                            'USAGE_DECLINE', 'UNLIMITED_PACK', 'PACK_POP']
+
+  
+  return df, manual_derived_columns
+
+
+
+def brute_force_features(data, feature_list_all, feature_list_high):
+  n = len(feature_list_high)
+  epsilon = 1e-6
+
+  # Grouping by Region
+  region_groups = data[feature_list_all + ['REGION']].groupby("REGION").mean()
+  for feature in feature_list_all:
+    feature_name = "REGION_MEAN_" + feature
+    region_groups[feature_name] = region_groups[feature]
+    region_groups.drop(feature, axis=1, inplace=True)
+
+  data = pd.merge(data, region_groups, on='REGION', how='left')
+
+
+  # log features
+  for feature in feature_list_all:
+    feature_name = 'log(' + feature + ")"
+    data[feature_name] = np.log(data[feature] + epsilon)
+
+  # Cross Features
+  for i in range(n-1):
+    for j in range(i+1, n):
+      feature_add = feature_list_high[i] + "+" + feature_list_high[j]
+      feature_sub = feature_list_high[i] + "-" + feature_list_high[j]
+      feature_mult = feature_list_high[i] + "*" + feature_list_high[j]
+      feature_div = feature_list_high[i] + "/" + feature_list_high[j]
+
+      data[feature_add] = data[feature_list_high[i]] + data[feature_list_high[j]]
+      data[feature_sub] = data[feature_list_high[i]] - data[feature_list_high[j]]
+      data[feature_mult] = data[feature_list_high[i]] * data[feature_list_high[j]]
+      data[feature_div] = data[feature_list_high[i]] / (data[feature_list_high[j]] + epsilon)
+
+  return data
+
+
+def feature_engineering(df, split = "train"):
+  df.drop('user_id', axis=1, inplace=True) 
+  #invariant
+  df.drop('MRG', axis=1, inplace=True)
+
+  #High NULL values
+  df.drop('ZONE1', axis=1, inplace=True) 
+  df.drop('ZONE2', axis=1, inplace=True) 
+
+  # Convert TENURE to numeric
+  mapping_dict = {'K > 24 month': 24, 'I 18-21 month': 18, 'H 15-18 month': 15, 'G 12-15 month': 12, 'J 21-24 month': 21, 'F 9-12 month': 9, 'E 6-9 month': 6, 'D 3-6 month': 3}
+  df['TENURE'].fillna('K > 24 month', inplace=True)
+  df['TENURE'] = df["TENURE"].apply(lambda x: mapping_dict[x])
+
+  original_columns = df.columns.tolist()
+  #print("Original Columns:", original_columns)
+  # Numerical Features with highest feature importance (XgBoost)
+  num_features_high = ['REGULARITY', 'REVENUE', 'ARPU_SEGMENT', 'FREQUENCE_RECH', 'MONTANT', 'ON_NET']
+  num_features_all = df.select_dtypes(include=["number"]).columns.tolist()
+  if(split=="train"):
+    num_features_all.remove("CHURN")
+
+  df, manual_derived_columns = create_derived_features(df)
+
+  data = brute_force_features(df, num_features_all, num_features_high)
+
+  drop = ['REGION', 'TOP_PACK']
+  data = data.drop(drop, axis=1)
+
+  return data
 
 
 print("ML Project Started" )
@@ -44,6 +199,9 @@ random.seed(RANDOM_SEED)
 
 df = pd.read_csv(DATA_PATH) 
 test_df = pd.read_csv(TEST_DATA_PATH)
+
+
+#df = df.iloc[:1000, :]
 
 #feature engineering
 df = feature_engineering(df)
@@ -85,7 +243,7 @@ rf_pipeline = Pipeline([
     #     random_state=RANDOM_SEED, n_estimators=100, n_jobs=-1, class_weight='balanced'
     # ))),
     ('classifier', RandomForestClassifier(
-        random_state=RANDOM_SEED, class_weight='balanced', n_jobs=-1, verbose=1
+        random_state=RANDOM_SEED, class_weight='balanced', n_jobs=6, verbose=1
     ))
 ], memory=PIPELINE_CACHE_DIR)
 
@@ -204,7 +362,7 @@ def evaluate_model(model, model_name, X_test, y_test = None):
     
     # Test set performance
     y_pred = model.predict(X_test)
-    y_pred_proba = grid_search.predict_proba(X_test)[:, 1]
+    y_pred_proba = model.predict_proba(X_test)[:, 1]
 
     best_cv_score = None
     test_auc = None
@@ -217,8 +375,8 @@ def evaluate_model(model, model_name, X_test, y_test = None):
         print(classification_report(y_test, y_pred))
 
         # Confusion matrices
-        cm = confusion_matrix(y_test, y_pred, labels=labels)
-        cm_norm = confusion_matrix(y_test, y_pred, labels=labels, normalize='true')
+        cm = confusion_matrix(y_test, y_pred)
+        cm_norm = confusion_matrix(y_test, y_pred, normalize='true')
 
         print(f"Confusion matrix:")
         print(f"CM : {cm}")
@@ -227,7 +385,7 @@ def evaluate_model(model, model_name, X_test, y_test = None):
         
     return {
         'model': model_name,
-        'best_cv_score': grid_search.best_score_,
+        #'best_cv_score': model.best_score_,
         'test_auc': test_auc,
         'y_pred' : y_pred
     }
@@ -246,11 +404,10 @@ print(" MODEL COMPARISON SUMMARY ")
 print(f"{'='*60}")
 
 for result in results:
-    print(f"{result['model']:25} | CV AUC: {result['best_cv_score']:.4f} | Test AUC: {result['test_auc']:.4f}")
-    if y_pred is not None:
+    if result['y_pred'] is not None:
         submission = pd.DataFrame({
             'ID': X_test.index,
             'CHURN_PROBABILITY': result['y_pred']
         })
-        submission.to_csv(RESULTS_PATH.format(result[model]), index=False)
+        submission.to_csv(f"{result['model']}_result.csv", index=False)
 

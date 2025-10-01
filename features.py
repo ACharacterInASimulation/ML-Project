@@ -64,12 +64,13 @@ def create_derived_features(df):
   manual_derived_columns = ['NULL_COUNTS', 'REVENUE_PER_FREQUENCE', 'SPENDING_CONSISTENCY',
                             'HIGH_VALUE_CUSTOMER', 'SPENDING_PATTERN', 'ENGAGEMENT_SCORE',
                             'USAGE_DECLINE', 'UNLIMITED_PACK', 'PACK_POP']
+
+  
   return df, manual_derived_columns
 
 
 
-def brute_force_features(df, feature_list_all, feature_list_high):
-  data = df.copy()
+def brute_force_features(data, feature_list_all, feature_list_high):
   n = len(feature_list_high)
   epsilon = 1e-6
 
@@ -115,6 +116,7 @@ def feature_engineering(df, split = "train"):
 
   # Convert TENURE to numeric
   mapping_dict = {'K > 24 month': 24, 'I 18-21 month': 18, 'H 15-18 month': 15, 'G 12-15 month': 12, 'J 21-24 month': 21, 'F 9-12 month': 9, 'E 6-9 month': 6, 'D 3-6 month': 3}
+  df['TENURE'].fillna('K > 24 month', inplace=True)
   df['TENURE'] = df["TENURE"].apply(lambda x: mapping_dict[x])
 
   original_columns = df.columns.tolist()
