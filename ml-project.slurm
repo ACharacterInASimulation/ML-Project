@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:nvidia-rtx-5000-ada-generation:1
-#SBATCH --mem=90G
+#SBATCH --mem=100G
 #SBATCH --time=20:00:00
 
 module load cuda/12.1
@@ -14,6 +14,6 @@ source /apps/local/anaconda3/bin/activate mlproject
 
 cd /home/badrinath.chandana/git/ACharacterInASimulation/ML-Project/ML-Project/
 
-python3 train.py 
+python3 train_best.py 
 
 echo "Finished training at $(date)"
