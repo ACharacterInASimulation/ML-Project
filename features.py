@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import random
-from const import RANDOM_SEED, DATA_PATH
+from const import RANDOM_SEED
 
 #Set Random seed
 np.random.seed(RANDOM_SEED)
@@ -119,7 +119,6 @@ def feature_engineering(df, split = "train"):
   df['TENURE'].fillna('K > 24 month', inplace=True)
   df['TENURE'] = df["TENURE"].apply(lambda x: mapping_dict[x])
 
-  original_columns = df.columns.tolist()
   #print("Original Columns:", original_columns)
   # Numerical Features with highest feature importance (XgBoost)
   num_features_high = ['REGULARITY', 'REVENUE', 'ARPU_SEGMENT', 'FREQUENCE_RECH', 'MONTANT', 'ON_NET']
