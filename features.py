@@ -110,10 +110,6 @@ def feature_engineering(df, split = "train"):
   #invariant
   df.drop('MRG', axis=1, inplace=True)
 
-  #High NULL values
-  df.drop('ZONE1', axis=1, inplace=True) 
-  df.drop('ZONE2', axis=1, inplace=True) 
-
   # Convert TENURE to numeric
   mapping_dict = {'K > 24 month': 24, 'I 18-21 month': 18, 'H 15-18 month': 15, 'G 12-15 month': 12, 'J 21-24 month': 21, 'F 9-12 month': 9, 'E 6-9 month': 6, 'D 3-6 month': 3}
   df['TENURE'].fillna('K > 24 month', inplace=True)
