@@ -10,4 +10,10 @@ BEST_RF_PARAMS = {'classifier__max_depth': 10, 'classifier__min_samples_leaf': 1
 
 BEST_XGB_PARAMS = {'classifier__learning_rate': 0.1, 'classifier__max_depth': 3, 'classifier__n_estimators': 200, 'classifier__subsample': 1.0, 'feature_selector__k': 30}
 
-RESULTS_PATH = "./results/predictions{}.csv"
+BEST_LR_PARAMS = {'classifier__C': 10, 'classifier__penalty': 'l2', 'classifier__solver': 'liblinear', 'feature_selector__k': 40}
+
+RESULTS_PATH = "./results/"
+
+
+N_JOBS = 6
+DEVICE = "cuda:0"
